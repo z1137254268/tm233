@@ -1,44 +1,41 @@
 # 1. 基础镜像
 FROM traffmonetizer/cli_v2:latest
 
-# 2. 切换 root 权限
+# 2. 切换 root
 USER root
 
-# 3. 安装 netcat (用于超低内存的 Web 伪装)
+# 3. 安装 netcat (Web伪装工具)
 RUN apk add --no-cache netcat-openbsd
 
-# 4. 【关键步骤】拯救挖矿程序
-# 既然 /app 可能会被平台覆盖，我们先全盘搜索 'Cli' 文件
-# 把它复制到 /usr/local/bin/tm_cli (这里绝对安全，不会被覆盖)
-RUN echo "🔍 Searching for original binary..." && \
+# 4. 备份程序 (防止 /app 被平台覆盖导致找不到程序)
+RUN echo "🔍 Backing up binary..." && \
     find / -type f -name "Cli" -exec cp {} /usr/local/bin/tm_cli \; && \
-    chmod +x /usr/local/bin/tm_cli && \
-    echo "✅ Binary saved to /usr/local/bin/tm_cli"
+    chmod +x /usr/local/bin/tm_cli
 
-# 5. 创建启动脚本
-# 使用 EOF 写入，逻辑清晰
+# 5. 【核心修改】设置工作目录为 /tmp
+# 这样程序就会在 /tmp 下创建配置文件，而不是去碰那个没有权限的 /app
+WORKDIR /tmp
+
+# 6. 创建启动脚本
 RUN cat <<EOF > /start.sh
 #!/bin/sh
 
-# === Web 保活部分 ===
-echo "🚀 Starting Fake Web Server (Netcat) on port \${PORT:-8080}..."
-# 使用 nc 监听端口，收到任何请求都返回 200 OK
-# 这是一个死循环，放在后台运行 (&)
+# === Web 保活 (Netcat) ===
+echo "🚀 Starting Web Server on port \${PORT:-8080}..."
+# 循环响应 HTTP 200
 while true; do 
-    echo -e "HTTP/1.1 200 OK\n\n Traffmonetizer Running..." | nc -l -p \${PORT:-8080} >/dev/null 2>&1
+    echo -e "HTTP/1.1 200 OK\n\n Traffmonetizer Running" | nc -l -p \${PORT:-8080} >/dev/null 2>&1
     sleep 1
 done &
 
-# === 挖矿业务部分 ===
-echo "💎 Starting Traffmonetizer from backup location..."
+# === 挖矿业务 ===
+echo "💎 Moving to /tmp and starting..."
 
-# 检查 Token
-if [ -z "\$TM_TOKEN" ]; then
-    echo "❌ Error: TM_TOKEN is missing!"
-    exit 1
-fi
+# 再次确保进入 /tmp 目录
+cd /tmp
 
-# 启动挖矿 (无限重启模式，防止崩溃退出)
+# 启动程序
+# 此时程序会在 /tmp/traffmonetizer 生成配置文件，这里绝对有权限！
 while true; do
     /usr/local/bin/tm_cli start accept --token "\$TM_TOKEN"
     echo "⚠️ Process exited. Restarting in 10s..."
@@ -46,11 +43,11 @@ while true; do
 done
 EOF
 
-# 6. 赋予脚本权限
+# 7. 赋予权限
 RUN chmod +x /start.sh
 
-# 7. 暴露端口
+# 8. 暴露端口
 EXPOSE 8080
 
-# 8. 启动
+# 9. 启动
 ENTRYPOINT ["/start.sh"]
