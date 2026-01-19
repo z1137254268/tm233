@@ -1,34 +1,34 @@
-# [...](asc_slot://start-slot-4)使用官方镜像
+# 使用官方镜像
 FROM traffmonetizer/cli_v2:latest
 
-# [...](asc_slot://start-slot-6)必须使用 root 权限来安装 Python
 USER root
 
-# 1. [...](asc_slot://start-slot-8)安装 Python3 (用于 Web 伪装)
-# 2. [...](asc_slot://start-slot-10)显式创建 /app 目录 (防止目录不存在报错)
-RUN apk add --no-cache python3 && \
-    mkdir -p /app
+# 1. 不再安装 python3，节省空间和内存！
+#    只安装 curl (如果之后需要调试) 或其他极简工具，这里什么都不装也可以
 
-# 设置工作目录
-WORKDIR /app
-
-# 3. [...](asc_slot://start-slot-12)生成启动脚本 (使用 printf 更安全)
-# 脚本逻辑：后台运行 Web 服务器保活 + 前台运行挖矿业务
+# 2. 生成启动脚本
+#    使用 busybox httpd 替代 python http.server
+#    -f 表示前台运行，-p 指定端口
 RUN printf "#!/bin/sh\n\
 echo '-----------------------------------'\n\
-echo '🚀 Starting Fake Web Server on port \${PORT:-8080}'\n\
-python3 -m http.server \${PORT:-8080} &\n\
+echo '🚀 Starting Tiny Web Server (BusyBox) on port \${PORT:-8080}'\n\
+\n\
+# 创建一个假的首页\n\
+echo 'Running...' > /index.html\n\
+\n\
+# 启动极简 Web 服务器 (占用 < 1MB 内存)\n\
+busybox httpd -f -p \${PORT:-8080} &\n\
+\n\
 echo '💎 Starting Traffmonetizer...'\n\
-# 确保二进制文件可执行\n\
 chmod +x /app/Cli\n\
 ./Cli start accept --token \"\$TM_TOKEN\"\n\
 " > /app/run.sh
 
-# 4. [...](asc_slot://start-slot-14)赋予脚本最高权限 (解决部分平台非 root 用户运行的问题)
+# 3. 赋予权限
 RUN chmod 777 /app/run.sh
 
-# 5. [...](asc_slot://start-slot-16)声明端口 (帮助云平台识别)
+# 4. 声明端口
 EXPOSE 8080
 
-# 启动命令
+# 启动
 ENTRYPOINT ["/app/run.sh"]
