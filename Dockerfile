@@ -1,34 +1,29 @@
-# 使用官方镜像
+# 1. 拉取官方镜像
 FROM traffmonetizer/cli_v2:latest
 
+# 2. 切换到 root 权限
 USER root
 
-# 1. 不再安装 python3，节省空间和内存！
-#    只安装 curl (如果之后需要调试) 或其他极简工具，这里什么都不装也可以
+# 3. 设置工作目录 (确保能找到 ./Cli 文件)
+WORKDIR /app
 
-# 2. 生成启动脚本
-#    使用 busybox httpd 替代 python http.server
-#    -f 表示前台运行，-p 指定端口
-RUN printf "#!/bin/sh\n\
-echo '-----------------------------------'\n\
-echo '🚀 Starting Tiny Web Server (BusyBox) on port \${PORT:-8080}'\n\
-\n\
-# 创建一个假的首页\n\
-echo 'Running...' > /index.html\n\
-\n\
-# 启动极简 Web 服务器 (占用 < 1MB 内存)\n\
-busybox httpd -f -p \${PORT:-8080} &\n\
-\n\
-echo '💎 Starting Traffmonetizer...'\n\
-chmod +x /app/Cli\n\
-./Cli start accept --token \"\$TM_TOKEN\"\n\
-" > /app/run.sh
+# 4. 生成启动脚本 (逐行写入，最稳健的方式)
+# 注意：${PORT:-8080} 和 $TM_TOKEN 前面都加了反斜杠 \ 
+# 这是为了告诉 Docker："不要现在替换变量，等容器运行的时候再替换"
+RUN echo '#!/bin/sh' > /app/run.sh && \
+    echo 'echo "-----------------------------------"' >> /app/run.sh && \
+    echo 'echo "🚀 Starting Tiny Web Server (BusyBox)..."' >> /app/run.sh && \
+    echo 'echo "Running..." > /index.html' >> /app/run.sh && \
+    echo 'busybox httpd -f -p ${PORT:-8080} &' >> /app/run.sh && \
+    echo 'echo "💎 Starting Traffmonetizer..."' >> /app/run.sh && \
+    echo 'chmod +x /app/Cli' >> /app/run.sh && \
+    echo './Cli start accept --token "$TM_TOKEN"' >> /app/run.sh
 
-# 3. 赋予权限
+# 5. 赋予脚本执行权限
 RUN chmod 777 /app/run.sh
 
-# 4. 声明端口
+# 6. 暴露端口 (即使我们用 host 网络，这个声明对云平台也有帮助)
 EXPOSE 8080
 
-# 启动
+# 7. 覆盖入口点
 ENTRYPOINT ["/app/run.sh"]
