@@ -1,26 +1,23 @@
-# 第一阶段：作为“资源库”，只为了提取官方文件
-FROM traffmonetizer/traffmonetizer:latest AS source
+# 修正镜像名称为 cli_v2
+FROM traffmonetizer/cli_v2:latest AS source
 
-# 第二阶段：构建我们要运行的实际环境 (使用 Alpine Linux)
 FROM alpine:latest
 
-# 1. 安装你需要的 netcat 和 .NET 运行所需的依赖库 (gcompat/icu-libs 是关键)
+# 安装依赖
 RUN apk add --no-cache \
     netcat-openbsd \
     ca-certificates \
     gcompat \
     icu-libs
 
-# 2. 从第一阶段把 TraffMonetizer 程序复制过来
-# 官方镜像通常把程序放在 /app/TraffMonetizer
+# 从新版镜像中复制程序
+# 注意：新版可能把二进制文件改名了，或者路径变了
+# 通常还是 /app/TraffMonetizer，如果这里报错，我们再调整路径
 COPY --from=source /app/TraffMonetizer /app/TraffMonetizer
 
-# 3. 设置工作目录
 WORKDIR /app
 
-# 4. 复制你的启动脚本并赋予权限
 COPY start.sh ./
 RUN chmod +x start.sh
 
-# 5. 启动
 CMD ["./start.sh"]
