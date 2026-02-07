@@ -37,7 +37,6 @@ RUN echo "🔍 Scanning for binary..." && \
 
 # 4. 配置工作目录和环境变量
 WORKDIR /app
-ENV DOTNET_GCHeapHardLimit=60000000
 ENV PORT=8080
 
 # 5. 生成启动脚本 (Entrypoint)
