@@ -2,20 +2,29 @@ FROM traffmonetizer/cli_v2:latest
 
 ENV DOTNET_GCHeapHardLimit=60000000
 
-# 覆盖默认入口，使用 Shell
-ENTRYPOINT ["/bin/sh", "-c"]
+# 1. 切换到 root (如果镜像允许)
+USER 0
 
-# 启动脚本逻辑：
-# 1. 打印调试信息
-# 2. 查找名为 'TraffMonetizer' 或 'Cli' 的文件
-# 3. 找到后直接运行
-CMD ["echo '🔍 Searching for binary...' && \
-      EXE=$(find /app /usr -name 'TraffMonetizer' -o -name 'Cli' -type f | head -n 1) && \
-      if [ -z \"$EXE\" ]; then \
-          echo '❌ Error: Binary not found!'; \
-          find / -maxdepth 3; \
-          exit 1; \
-      else \
-          echo \"✅ Found binary at: $EXE\"; \
-          $EXE start accept --token $TM_TOKEN; \
-      fi"]
+# 2. 生成启动脚本 /start.sh
+# 我们用 printf 来避免特殊字符问题
+# 逻辑：尝试运行 ./Cli 或 ./TraffMonetizer
+# 并且加上了详细的调试信息
+RUN printf "#!/bin/sh\n\
+echo 'Running start script...'\n\
+echo 'Current User: \$(whoami)'\n\
+echo 'Files in current dir:'\n\
+ls -lh\n\
+\n\
+if [ -f \"./Cli\" ]; then\n\
+    echo 'Found ./Cli, starting...'\n\
+    ./Cli start accept --token \$TM_TOKEN\n\
+elif [ -f \"./TraffMonetizer\" ]; then\n\
+    echo 'Found ./TraffMonetizer, starting...'\n\
+    ./TraffMonetizer start accept --token \$TM_TOKEN\n\
+else\n\
+    echo 'Binary not found in current dir. Searching / ...'\n\
+    find / -name 'Cli' -o -name 'TraffMonetizer' 2>/dev/null\n\
+fi\n" > /start.sh && chmod +x /start.sh
+
+# 3. 设置入口
+ENTRYPOINT ["/bin/sh", "/start.sh"]
