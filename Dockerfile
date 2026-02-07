@@ -1,10 +1,11 @@
 FROM traffmonetizer/cli_v2:latest
 
+# 1. 限制内存 (这是你最想要的功能之一)
 ENV DOTNET_GCHeapHardLimit=60000000
 
-# 不要用 USER 0，也不要用 RUN
-# 直接把所有逻辑写在一行 Shell 命令里
-# 1. 打印调试信息
-# 2. 尝试运行 ./Cli
-# 3. 尝试运行 ./TraffMonetizer
-ENTRYPOINT ["/bin/sh", "-c", "echo 'Running...' && ls -lh && (./Cli start accept --token $TM_TOKEN || ./TraffMonetizer start accept --token $TM_TOKEN || echo 'FATAL: Binary not found')"]
+# 2. 传递 Token
+ENV TM_TOKEN=$TM_TOKEN
+
+# 3. 保持最原始的启动方式 (不要加 /bin/sh 之类的)
+# 直接传参给官方镜像的默认入口
+CMD ["start", "accept", "--token", "${TM_TOKEN}"]
