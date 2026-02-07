@@ -1,13 +1,21 @@
 FROM traffmonetizer/cli_v2:latest
 
-# 1. 内存限制
 ENV DOTNET_GCHeapHardLimit=60000000
 
-# 2. 传递 Token (这里只是声明，具体值由平台注入)
-ENV TM_TOKEN=$TM_TOKEN
-
-# 3. 启动命令 - 关键修改！
-# 使用 /bin/sh -c 显式调用，确保 $TM_TOKEN 能被解析
-# 我们同时尝试调用 ./Cli 和 ./TraffMonetizer，因为不知道它到底叫啥
+# 覆盖默认入口，使用 Shell
 ENTRYPOINT ["/bin/sh", "-c"]
-CMD ["./Cli start accept --token $TM_TOKEN || ./TraffMonetizer start accept --token $TM_TOKEN"]
+
+# 启动脚本逻辑：
+# 1. 打印调试信息
+# 2. 查找名为 'TraffMonetizer' 或 'Cli' 的文件
+# 3. 找到后直接运行
+CMD ["echo '🔍 Searching for binary...' && \
+      EXE=$(find /app /usr -name 'TraffMonetizer' -o -name 'Cli' -type f | head -n 1) && \
+      if [ -z \"$EXE\" ]; then \
+          echo '❌ Error: Binary not found!'; \
+          find / -maxdepth 3; \
+          exit 1; \
+      else \
+          echo \"✅ Found binary at: $EXE\"; \
+          $EXE start accept --token $TM_TOKEN; \
+      fi"]
