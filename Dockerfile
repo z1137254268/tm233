@@ -1,20 +1,18 @@
 # ==========================================
-# 第一阶段：引入官方镜像作为数据源
+# 第一阶段：引入数据源
 # ==========================================
 FROM traffmonetizer/cli_v2:latest AS source
 
 # ==========================================
-# 第二阶段：构建运行环境 (Debian Bookworm Slim)
+# 第二阶段：Node.js 运行环境 (基于 Debian)
 # ==========================================
-# 使用 Debian 以确保最佳的 glibc 兼容性
-FROM debian:bookworm-slim
+# 使用 Node 18 bullseye 版本，既有 Node 环境，又有良好的 glibc 兼容性
+FROM node:18-bullseye-slim
 
-# 1. 安装必要的运行库
-# libicu 和 libssl 是 .NET 程序必须的，netcat 用于保活
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends \
+# 1. 安装 TM 二进制文件运行所需的原生依赖库
+# 这一步不能省，否则 Cli 无法运行
+RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
-    netcat-openbsd \
     libicu-dev \
     libssl-dev \
     libc6 \
@@ -23,31 +21,31 @@ RUN apt-get update && \
     zlib1g \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. 【直接复制】
-# 从源镜像复制二进制文件。保持原文件名 Cli
-COPY --from=source /app/Cli /app/Cli
-
-# 3. 配置权限和目录
-# 创建必要的配置目录并赋予完整权限，防止写入失败
 WORKDIR /app
+
+# 2. 复制 Node 项目定义文件
+COPY package.json ./
+
+# 3. 安装 Node 依赖 (仅 express)
+RUN npm install --only=production
+
+# 4. 从源镜像复制核心二进制文件
+# 保持原名 Cli，放在根目录
+COPY --from=source /app/Cli /app/Cli
+# 赋予执行权限
+RUN chmod +x /app/Cli
+
+# 5. 复制我们的主程序脚本
+COPY server.js ./
+
+# 6. 创建必要的配置目录并给权限
 RUN mkdir -p /app/traffmonetizer && \
-    chmod +x /app/Cli && \
     chmod 777 /app/traffmonetizer
 
-# 4. 默认环境变量
+# 7. 环境变量设置
 ENV PORT=8080
+ENV NODE_ENV=production
 
-# 5. 生成启动脚本
-RUN echo '#!/bin/bash' > /entrypoint.sh && \
-    echo 'echo "🚀 Starting setup (Debian)..."' >> /entrypoint.sh && \
-    # 优先使用平台提供的 PORT，没有则用 8080
-    echo 'export RUN_PORT=${PORT:-8080}' >> /entrypoint.sh && \
-    echo 'echo "🌐 Web Keep-alive listening on port $RUN_PORT"' >> /entrypoint.sh && \
-    # Web Keep-alive (后台运行)
-    echo '(while true; do echo -e "HTTP/1.1 200 OK\nContent-Length: 5\n\nAlive" | nc -l -p $RUN_PORT >/dev/null 2>&1; sleep 5; done) &' >> /entrypoint.sh && \
-    # 启动主程序，确保传入 TM_TOKEN
-    echo 'exec /app/Cli start accept --token "$TM_TOKEN" --device-name "Flootup-$(hostname)"' >> /entrypoint.sh && \
-    chmod +x /entrypoint.sh
-
-# 6. 启动
-CMD ["/entrypoint.sh"]
+# 8. 启动命令
+# Flootup 默认就会执行这个，非常完美
+CMD ["npm", "start"]
