@@ -2,7 +2,7 @@
 FROM traffmonetizer/cli_v2:latest
 
 # 2. 切换 root
-USER root
+USER 0
 
 # 3. 安装 netcat (Web伪装工具)
 RUN apk add --no-cache netcat-openbsd
