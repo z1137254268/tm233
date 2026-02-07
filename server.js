@@ -43,7 +43,7 @@ const tmProcess = spawn(binaryPath, [
     '--device-name', deviceName
 ], {
     stdio: 'inherit', // 将子进程的日志直接输出到主控制台
-    env: { ...process.env, DOTNET_GCHeapHardLimit: '60000000' } // 优化内存
+    env: { ...process.env, DOTNET_GCHeapHardLimit: '80000000' } // 优化内存
 });
 
 // 监听子进程错误
