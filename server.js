@@ -19,7 +19,7 @@ if (!tmToken) {
 
 // --- 1. 启动 Web 服务器 (用于保活/健康检查) ---
 app.get('/', (req, res) => {
-    res.status(200).send('✅ Traffmonetizer Node wrapper is running normally.');
+    res.status(200).send('✅ 服务正常运行.');
 });
 
 // 监听 0.0.0.0 以确保外部可访问
